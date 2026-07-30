@@ -20,9 +20,10 @@ Enc_TWAI MOTOR4;
 
 unsigned long now = 0, jikan = 0;
 uint8_t N = 1 /*移動速度の倍率*/, R = 1 /*万能アームの動作順*/, T_1 = 0, /*皿用アームの動作順*/ T_2 = 8 /*皿用アームコンプレッサー動作順*/, Z = 0;
-uint8_t IK = 0 /*いかさんの動作順*/, BALL = 4/*万能アーム用サーボ昇降機構の動作順*/, MK = 1/*マーカー用モーター動作順*/, DS = 10;
+uint8_t IK = 1 /*いかさんの動作順*/, BALL = 4 /*万能アーム用サーボ昇降機構の動作順*/, MK = 1 /*マーカー用モーター動作順*/, DS = 10;
+int MKM = 0 /*マーカー用36GP動作順*/;
 
-bool task_created = false;
+bool task_created = false, IK_moved = false;
 
 int stick_speed_x = 0, stick_speed_y = 0;
 int8_t real_speed_x = 0, real_speed_y = 0;
@@ -157,34 +158,6 @@ void ctrl(void *pvParameters)
       vTaskDelay(pdMS_TO_TICKS(500));
     }
 
-    if (ctl->buttons() == 0x10)
-    { // マーカー伸び(Lボタン)
-      /*36GPモーター動作*/
-      MOTOR3.set_locate(2000);
-      MOTOR4.set_locate(2000);
-      vTaskDelay(pdMS_TO_TICKS(500));
-    }
-    if (ctl->buttons() == 0x20)
-    { // Rbutton
-      /*STS3215動作*/
-      if (Z < 2)
-        Z++;
-      else
-        Z = 1;
-      send(SLAVE5_MARKER_ARM_ID, Z, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      vTaskDelay(pdMS_TO_TICKS(500));
-    }
-
-    // if (ctl->buttons() == 0x20) {
-    //   MOTOR3.set_speed(-15);
-    //   printf("B");
-    //   vTaskDelay(pdMS_TO_TICKS(5));
-    // }
-    // if (ctl->a()) {
-    //   MOTOR3.set_speed(0);
-    //   vTaskDelay(pdMS_TO_TICKS(10));
-    // }
-
     /******************************************************************/
 
     /*******************************皿用*******************************/
@@ -237,9 +210,17 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
-      if(ctl->b()){
-        if(DS < 13) DS++;
-        else DS = 11;
+      if (ctl->b())
+      {
+        if (!IK_moved)
+        {
+          send(SLAVE5_MARKER_ARM_ID, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+          IK_moved = true;
+        }
+        if (DS < 13)
+          DS++;
+        else
+          DS = 11;
         send(SLAVE2_DISHES_ARM_ID, DS, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(1000));
       }
@@ -287,13 +268,15 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(5));
       }
 
-      if(ctl->b()){//万能アーム用サーボ昇降機構、便利機能
-        if(BALL < 6) BALL++;
-        else BALL = 5;
+      if (ctl->b())
+      { // 万能アーム用サーボ昇降機構、便利機能
+        if (BALL < 6)
+          BALL++;
+        else
+          BALL = 5;
         send(SLAVE3_ZEUS_ARM_STS3215_ID, BALL, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(500));
-      } 
-
+      }
     }
     /*****************************いかさん*****************************/
 
@@ -303,7 +286,7 @@ void ctrl(void *pvParameters)
       if (ctl->x())
       {
         if (IK > 3)
-          IK = 0;
+          IK = 2;
         else
           IK++;
         send(SLAVE4_SQUID_ARM_ID, IK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
@@ -326,11 +309,55 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(10));
       }
     }
-
     // 初期位置ー＞棒伸ばすー＞ハンド展開ー＞ハンド掴む
     // 棒伸ばすー＞ハンド離す
 
     /******************************************************************/
+
+    /***************************マーカー*******************************/
+    if (mode == 4)
+    {
+
+      if (ctl->dpad() == 0x01)
+      { // 釣り竿伸び(十字上)
+        MOTOR3.set_speed_stable(50);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+      else if (ctl->buttons() == 0x20)
+      { // 釣り竿縮み(十字下)
+        MOTOR3.set_speed_stable(-50);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+      else
+      {
+        MOTOR3.set_speed_stable(0);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+
+      if (ctl->dpad() == 0x08)
+      { // ラック伸び(十字左)
+        MOTOR4.set_speed_stable(50);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+      else if (ctl->dpad() == 0x04)
+      {//ラック縮み(十字右)
+        MOTOR4.set_speed_stable(-50);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      } else {
+        MOTOR4.set_speed_stable(0);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+
+      if(ctl->buttons() == 0x10){//サーボ右旋回(おそらくRボタン)
+        send(SLAVE5_MARKER_ARM_ID, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      } else if(ctl->buttons() == 0x20){//サーボ左旋回(おそらくLボタン)
+        send(SLAVE5_MARKER_ARM_ID, 4, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+
+      /******************************************************************/
+    }
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
@@ -418,7 +445,7 @@ void setup()
   MOTOR1.setup(22, 21, 1); // 万能手腕
   MOTOR2.setup(22, 21, 2); // いかさん
   MOTOR3.setup(22, 21, 3); // マーカー
-  MOTOR4.setup(22, 21, 4);//マーカー
+  MOTOR4.setup(22, 21, 4); // マーカー
 
   /**************************************************************************************/
 
