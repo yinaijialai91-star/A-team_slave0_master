@@ -8,7 +8,7 @@
 #define RX_PIN 21
 
 #define SLAVE1_WHEEL_CONTROL_ID 0x310    // タイヤ
-#define SLAVE2_DISHES_ARM_ID 0x100       // お皿
+#define SLAVE2_DISHES_ARM_ID 0x710       // お皿
 #define SLAVE3_ZEUS_ARM_STS3215_ID 0x410 // 万能手腕
 #define SLAVE4_SQUID_ARM_ID 0x110        // いかさん
 #define SLAVE5_MARKER_ARM_ID 0x210       // マーカー
@@ -230,6 +230,7 @@ void ctrl(void *pvParameters)
         {
           send(SLAVE5_MARKER_ARM_ID, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
           IK_moved = true;
+          vTaskDelay(pdMS_TO_TICKS(200));
         }
         if (DS < 13)
           DS++;
@@ -365,12 +366,12 @@ void ctrl(void *pvParameters)
       if (ctl->dpad() == 0x01)
       { // 釣り竿伸び(十字上)
         MOTOR3.set_speed_stable(255);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(5));
       }
-      else if (ctl->dpad() == 0x20)
+      else if (ctl->dpad() == 0x02)
       { // 釣り竿縮み(十字下)
         MOTOR3.set_speed_stable(-255);
-        vTaskDelay(pdMS_TO_TICKS(50));
+        vTaskDelay(pdMS_TO_TICKS(5));
       }
       else
       {
