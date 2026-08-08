@@ -1,8 +1,9 @@
 // Aチーム用マスター
 
-#include <Enc_TWAI.h>
-#include "driver/twai.h"
+#include <Enc_TWAI.h>    //36GP-3650制御用
+#include "driver/twai.h" //
 #include <Bluepad32.h>
+#include <uni.h>
 
 #define TX_PIN 22
 #define RX_PIN 21
@@ -19,10 +20,12 @@ Enc_TWAI MOTOR2;
 Enc_TWAI MOTOR3;
 Enc_TWAI MOTOR4;
 
+static const char *controller_addr_string = "98:B6:EA:96:93:4B";
+
 unsigned long now = 0, jikan = 0;
 uint8_t N = 1 /*移動速度の倍率*/, R = 1 /*万能アームの動作順*/, T_1 = 0, /*皿用アームの動作順*/ T_2 = 8 /*皿用アームコンプレッサー動作順*/, Z = 0;
-uint8_t IK = 1 /*いかさんの動作順*/, BALL = 4 /*万能アーム用サーボ昇降機構の動作順*/, MK = 1 /*マーカー用モーター動作順*/, DS = 10;
-int MKM = 0 /*マーカー用36GP動作順*/, BBB = 9 /*万能アーム用サーボムツゴロウ動作順*/;
+uint8_t IK = 6 /*いかさん用アーム動作順*/, IKK = 8 /*いかさん用ハンド動作順*/, BALL = 4 /*万能アーム用サーボ昇降機構の動作順*/, MK = 1 /*マーカー用モーター動作順*/, DS = 10;
+int MKM = 0 /*マーカー動作順*/, BBB = 9 /*万能アーム用サーボムツゴロウ動作順*/;
 
 bool task_created = false, IK_moved = false;
 
@@ -155,7 +158,7 @@ void ctrl(void *pvParameters)
       }
       else
       {
-        mode = 1;
+        mode = 2;
       }
       printf("now_mode_is %d\n", mode);
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
@@ -248,10 +251,10 @@ void ctrl(void *pvParameters)
     {
       if (ctl->x())
       { // 万能アーム動作（仮
-        if (R < 5)
+        if (R < 6)
           R++;
         else
-          R = 4;
+          R = 2;
         send(SLAVE3_ZEUS_ARM_STS3215_ID, 3, R, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(500));
       }
@@ -323,29 +326,42 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(500));
       }
     }
-    /*****************************いかさん*****************************/
 
+    /******************************************************************/
+
+    /*****************************いかさん*****************************/
     if (mode == 3)
     {
 
       if (ctl->x())
       {
-        if (IK > 3)
-          IK = 2;
-        else
+        if (IK < 7)
           IK++;
-        send(SLAVE4_SQUID_ARM_ID, IK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        else
+          IK = 6;
+        send(SLAVE5_MARKER_ARM_ID, IK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->b())
+      {
+        if (IKK < 10)
+          IKK++;
+        else
+          IKK = 9;
+
+        send(SLAVE5_MARKER_ARM_ID, IKK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
       if (ctl->y())
       {
-        MOTOR2.set_speed(60);
+        MOTOR2.set_speed(-160);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (ctl->a())
       {
-        MOTOR2.set_speed(-60);
+        MOTOR2.set_speed(160);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (!ctl->y() && !ctl->a())
@@ -354,12 +370,10 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(10));
       }
     }
-    // 初期位置ー＞棒伸ばすー＞ハンド展開ー＞ハンド掴む
-    // 棒伸ばすー＞ハンド離す
 
     /******************************************************************/
 
-    /***************************マーカー*******************************/
+    /*****************************マーカー*****************************/
     if (mode == 4)
     {
 
@@ -379,12 +393,12 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
-      if (ctl->dpad() == 0x08)
-      { // ラック伸び(十字左)
-        MOTOR4.set_speed_stable(100);
-        vTaskDelay(pdMS_TO_TICKS(50));
-      }
-      else if (ctl->dpad() == 0x04)
+      // if (ctl->dpad() == 0x08)
+      // { // ラック伸び(十字左)
+      //   MOTOR4.set_speed_stable(100);
+      //   vTaskDelay(pdMS_TO_TICKS(50));
+      // }
+      /*else*/ if (ctl->dpad() == 0x04)
       { // ラック縮み(十字右)
         MOTOR4.set_speed_stable(-100);
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -406,8 +420,64 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
+      if (ctl->b())
+      { /*釣り竿伸びきり*/
+        MOTOR3.set_locate(1872);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+      else if (ctl->y())
+      { /*釣り竿ちょい伸びきり*/
+        MOTOR3.set_locate(1672);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->x())
+      { /*ラック伸びきり*/
+        MOTOR4.set_locate(478);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+      else if (ctl->a())
+      { /*ラック縮みきり*/
+        MOTOR4.set_locate(0);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->dpad() == 0x01)
+      { /*いかさん旋回*/
+        send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->dpad() == 0x08)
+      {
+        MKM++;
+
+        if (MKM == 1)
+        { // いかさん旋回
+          send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+          vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+        else if (MKM == 2)
+        { // 釣り竿ちょい伸び切り
+          MOTOR3.set_locate(1672);
+          vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+        else if (MKM == 3)
+        { // ラック伸びきり
+          MOTOR4.set_locate(478);
+          vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+        else if (MKM == 4)
+        { // 釣り竿伸び切り
+          MOTOR3.set_locate(1872);
+          vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+      }
+
       /******************************************************************/
     }
+
+    /******************************************************************/
 
     vTaskDelay(pdMS_TO_TICKS(1));
   }
@@ -518,8 +588,13 @@ void setup()
   /************************************Bluepad32*****************************************/
 
   BP32.setup(&onConnectedController, &onDisconnectedController);
-  BP32.forgetBluetoothKeys();
+  // BP32.forgetBluetoothKeys();
   BP32.enableVirtualDevice(false);
+
+  bd_addr_t controller_addr;
+  sscanf_bd_addr(controller_addr_string, controller_addr);
+  uni_bt_allowlist_add_addr(controller_addr);
+  uni_bt_allowlist_set_enabled(true);
 
   /**************************************************************************************/
 }
