@@ -163,6 +163,14 @@ void ctrl(void *pvParameters)
       printf("now_mode_is %d\n", mode);
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
       vTaskDelay(pdMS_TO_TICKS(500));
+      send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      // twai_message_t receiveframe;
+      // while (receiveframe.identifier != 0x20)
+      // {
+      //   send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      //   twai_receive(&receiveframe, pdMS_TO_TICKS(0));
+      //   Serial.printf("応答無為再送");
+      // }
     }
 
     if (ctl->buttons() == 0x100)
@@ -227,7 +235,7 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
-      if (ctl->b())
+      if (ctl->b()) // 皿用便利機能
       {
         if (!IK_moved)
         {
@@ -261,12 +269,12 @@ void ctrl(void *pvParameters)
 
       if (ctl->y())
       { // 万能アーム用昇降機構、下
-        MOTOR1.set_speed_stable(-160);
+        MOTOR1.set_speed_stable(-240);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (ctl->a())
       { // 万能アーム用昇降機構、上
-        MOTOR1.set_speed_stable(160);
+        MOTOR1.set_speed_stable(240);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (!ctl->y() && !ctl->a())
@@ -299,7 +307,7 @@ void ctrl(void *pvParameters)
 
       if (ctl->buttons() == 0x20)
       { // ちょい離し(Rボタン)
-        if (BBB < 14)
+        if (BBB < 13)
         {
           BBB++;
         }
@@ -393,12 +401,12 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
-      // if (ctl->dpad() == 0x08)
-      // { // ラック伸び(十字左)
-      //   MOTOR4.set_speed_stable(100);
-      //   vTaskDelay(pdMS_TO_TICKS(50));
-      // }
-      /*else*/ if (ctl->dpad() == 0x04)
+      if (ctl->dpad() == 0x08)
+      { // ラック伸び(十字左)
+        MOTOR4.set_speed_stable(100);
+        vTaskDelay(pdMS_TO_TICKS(50));
+      }
+      else if (ctl->dpad() == 0x04)
       { // ラック縮み(十字右)
         MOTOR4.set_speed_stable(-100);
         vTaskDelay(pdMS_TO_TICKS(50));
@@ -420,54 +428,28 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
+      // if (ctl->dpad() == 0x01)
+      // { /*いかさん旋回*/
+      //   send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      //   vTaskDelay(pdMS_TO_TICKS(500));
+      // }
+
       if (ctl->b())
-      { /*釣り竿伸びきり*/
-        MOTOR3.set_locate(1872);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-      else if (ctl->y())
-      { /*釣り竿ちょい伸びきり*/
-        MOTOR3.set_locate(1672);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->x())
-      { /*ラック伸びきり*/
-        MOTOR4.set_locate(478);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-      else if (ctl->a())
-      { /*ラック縮みきり*/
-        MOTOR4.set_locate(0);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->dpad() == 0x01)
-      { /*いかさん旋回*/
-        send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->dpad() == 0x08)
       {
         MKM++;
 
         if (MKM == 1)
-        { // いかさん旋回
+        { // 釣り竿ちょい伸び切り, いかさん旋回
           send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-          vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-        else if (MKM == 2)
-        { // 釣り竿ちょい伸び切り
           MOTOR3.set_locate(1672);
           vTaskDelay(pdMS_TO_TICKS(2000));
         }
-        else if (MKM == 3)
+        else if (MKM == 2)
         { // ラック伸びきり
-          MOTOR4.set_locate(478);
+          MOTOR4.set_locate(533);
           vTaskDelay(pdMS_TO_TICKS(2000));
         }
-        else if (MKM == 4)
+        else if (MKM == 3)
         { // 釣り竿伸び切り
           MOTOR3.set_locate(1872);
           vTaskDelay(pdMS_TO_TICKS(2000));
@@ -552,7 +534,9 @@ void vector_task(void *pvParameters)
 
     send(SLAVE1_WHEEL_CONTROL_ID, 1, N, v1, v2, v3, v4, 0xAA, 0xAA);
 
-    vTaskDelay(pdMS_TO_TICKS(1));
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    // send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
   }
 }
 
@@ -595,6 +579,7 @@ void setup()
   sscanf_bd_addr(controller_addr_string, controller_addr);
   uni_bt_allowlist_add_addr(controller_addr);
   uni_bt_allowlist_set_enabled(true);
+  // uni_bt_allowlist_remove_all();
 
   /**************************************************************************************/
 }
