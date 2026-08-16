@@ -1,12 +1,12 @@
 // Aチーム用マスター
 
 #include <Enc_TWAI.h>    //36GP-3650制御用
-#include "driver/twai.h" //
-#include <Bluepad32.h>
-#include <uni.h>
+#include "driver/twai.h" //CAN通信用
+#include <Bluepad32.h>   //無線コン制御用
+#include <uni.h>         //MACホワイトリスト作成用
 
-#define TX_PIN 22
-#define RX_PIN 21
+#define TX_PIN 22 // CAN用TXピン
+#define RX_PIN 21 // CAN用RXピン
 
 #define SLAVE1_WHEEL_CONTROL_ID 0x310    // タイヤ
 #define SLAVE2_DISHES_ARM_ID 0x710       // お皿
@@ -15,19 +15,28 @@
 #define SLAVE5_MARKER_ARM_ID 0x210       // マーカー
 #define SLAVEX_BUTSUDAN_LED_ID 0x115     // 仏壇
 
-Enc_TWAI MOTOR1;
-Enc_TWAI MOTOR2;
-Enc_TWAI MOTOR3;
-Enc_TWAI MOTOR4;
+Enc_TWAI MOTOR1; // 万能手腕
+Enc_TWAI MOTOR2; // いかさん
+Enc_TWAI MOTOR3; // 釣り竿
+Enc_TWAI MOTOR4; // 釣り竿ラック
 
 static const char *controller_addr_string = "98:B6:EA:96:93:4B";
 
 unsigned long now = 0, jikan = 0;
-uint8_t N = 1 /*移動速度の倍率*/, R = 1 /*万能アームの動作順*/, T_1 = 0, /*皿用アームの動作順*/ T_2 = 8 /*皿用アームコンプレッサー動作順*/, Z = 0;
-uint8_t IK = 6 /*いかさん用アーム動作順*/, IKK = 8 /*いかさん用ハンド動作順*/, BALL = 4 /*万能アーム用サーボ昇降機構の動作順*/, MK = 1 /*マーカー用モーター動作順*/, DS = 10;
-int MKM = 0 /*マーカー動作順*/, BBB = 9 /*万能アーム用サーボムツゴロウ動作順*/;
+uint8_t N = 1;    /*移動速度の倍率*/
+uint8_t R = 1;    /*万能アームの動作順*/
+uint8_t T_1 = 0;  /*皿用アームの動作順*/
+uint8_t T_2 = 8;  /*皿用アームコンプレッサー動作順*/
+uint8_t IK = 6;   /*いかさん用アーム動作順*/
+uint8_t IKK = 8;  /*いかさん用ハンド動作順*/
+uint8_t BALL = 4; /*万能アーム用サーボ昇降機構の動作順*/
+uint8_t MK = 1;   /*マーカー用モーター動作順*/
+uint8_t DS = 10;  /*皿用便利機能動作順*/
+uint8_t MKM = 0;  /*マーカー動作順*/
+uint8_t BBB = 9;  /*万能アーム用サーボムツゴロウ動作順*/
 
 bool task_created = false, IK_moved = false;
+bool motor1_stopped = false, motor2_stopped = false;
 
 int stick_speed_x = 0, stick_speed_y = 0;
 int8_t real_speed_x = 0, real_speed_y = 0;
@@ -135,7 +144,7 @@ void ctrl(void *pvParameters)
 
     if (ctl->miscButtons() == 0x04)
     { // 移動速度の倍率変更(プラスボタン)
-      if (N < 4)
+      if (N < 2)
         N++;
       else
         N = 1;
@@ -146,7 +155,7 @@ void ctrl(void *pvParameters)
       if (N > 1)
         N--;
       else
-        N = 4;
+        N = 2;
       vTaskDelay(pdMS_TO_TICKS(500));
     }
 
@@ -164,6 +173,8 @@ void ctrl(void *pvParameters)
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
       vTaskDelay(pdMS_TO_TICKS(500));
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      vTaskDelay(pdMS_TO_TICKS(10));
+      send(SLAVE5_MARKER_ARM_ID, ((mode == 2) ? 20 : 21), 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
       // twai_message_t receiveframe;
       // while (receiveframe.identifier != 0x20)
       // {
@@ -175,7 +186,7 @@ void ctrl(void *pvParameters)
 
     if (ctl->buttons() == 0x100)
     {
-      if (wheel_mode < 1)
+      if (wheel_mode < 3)
         wheel_mode++;
       else
         wheel_mode = 0;
@@ -188,7 +199,7 @@ void ctrl(void *pvParameters)
     /*******************************皿用*******************************/
     if (mode == 1)
     {
-
+      wheel_mode = 0;
       if (ctl->x())
       { // コンプレッサー動作変更
         if (T_2 < 10)
@@ -254,10 +265,57 @@ void ctrl(void *pvParameters)
 
     /******************************************************************/
 
-    /*****************************万能手腕*****************************/
+    /*****************************いかさん*****************************/
     if (mode == 2)
     {
+
+      wheel_mode = 2;
+
       if (ctl->x())
+      {
+        if (IK < 7)
+          IK++;
+        else
+          IK = 6;
+        send(SLAVE5_MARKER_ARM_ID, IK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->b())
+      {
+        if (IKK < 11)
+          IKK++;
+        else
+          IKK = 9;
+
+        send(SLAVE5_MARKER_ARM_ID, IKK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->y())
+      {
+        MOTOR2.set_speed_stable(-200);
+        vTaskDelay(pdMS_TO_TICKS(5));
+      }
+      else if (ctl->a())
+      {
+        MOTOR2.set_speed_stable(200);
+        vTaskDelay(pdMS_TO_TICKS(5));
+      }
+      else if (!ctl->y() && !ctl->a())
+      {
+        MOTOR2.set_speed_stable(0);
+        vTaskDelay(pdMS_TO_TICKS(10));
+      }
+    }
+
+    /******************************************************************/
+
+    /*****************************万能手腕*****************************/
+    if (mode == 3)
+    {
+      wheel_mode = 3;
+      if (ctl->b())
       { // 万能アーム動作（仮
         if (R < 6)
           R++;
@@ -271,16 +329,20 @@ void ctrl(void *pvParameters)
       { // 万能アーム用昇降機構、下
         MOTOR1.set_speed_stable(-240);
         vTaskDelay(pdMS_TO_TICKS(5));
+        motor1_stopped = false;
       }
       else if (ctl->a())
       { // 万能アーム用昇降機構、上
         MOTOR1.set_speed_stable(240);
         vTaskDelay(pdMS_TO_TICKS(5));
+        motor1_stopped = false;
       }
-      else if (!ctl->y() && !ctl->a())
+      else if (!ctl->y() && !ctl->a() && !motor1_stopped)
       { // 万能アーム用昇降機構、停止
         MOTOR1.set_speed_stable(0);
         vTaskDelay(pdMS_TO_TICKS(10));
+        MOTOR1.set_speed_stable(0);
+        motor1_stopped = true;
       }
 
       if (ctl->dpad() == 0x0001)
@@ -324,7 +386,7 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
-      if (ctl->b())
+      if (ctl->x())
       { // 万能アーム用サーボ昇降機構、便利機能
         if (BALL < 6)
           BALL++;
@@ -337,54 +399,10 @@ void ctrl(void *pvParameters)
 
     /******************************************************************/
 
-    /*****************************いかさん*****************************/
-    if (mode == 3)
-    {
-
-      if (ctl->x())
-      {
-        if (IK < 7)
-          IK++;
-        else
-          IK = 6;
-        send(SLAVE5_MARKER_ARM_ID, IK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->b())
-      {
-        if (IKK < 10)
-          IKK++;
-        else
-          IKK = 9;
-
-        send(SLAVE5_MARKER_ARM_ID, IKK, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->y())
-      {
-        MOTOR2.set_speed(-160);
-        vTaskDelay(pdMS_TO_TICKS(5));
-      }
-      else if (ctl->a())
-      {
-        MOTOR2.set_speed(160);
-        vTaskDelay(pdMS_TO_TICKS(5));
-      }
-      else if (!ctl->y() && !ctl->a())
-      {
-        MOTOR2.set_speed(0);
-        vTaskDelay(pdMS_TO_TICKS(10));
-      }
-    }
-
-    /******************************************************************/
-
     /*****************************マーカー*****************************/
     if (mode == 4)
     {
-
+      wheel_mode = 1;
       if (ctl->dpad() == 0x01)
       { // 釣り竿伸び(十字上)
         MOTOR3.set_speed_stable(255);
@@ -427,12 +445,6 @@ void ctrl(void *pvParameters)
         send(SLAVE5_MARKER_ARM_ID, 4, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(50));
       }
-
-      // if (ctl->dpad() == 0x01)
-      // { /*いかさん旋回*/
-      //   send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      //   vTaskDelay(pdMS_TO_TICKS(500));
-      // }
 
       if (ctl->b())
       {
@@ -518,18 +530,32 @@ void vector_task(void *pvParameters)
     // int8_t v4 = constrain(real_speed_y - real_speed_x - senkai, -100, 100);
 
     if (wheel_mode == 0)
-    {
+    { // お皿
       v1 = constrain(real_speed_y - real_speed_x + senkai, -100, 100);
       v2 = constrain(real_speed_y + real_speed_x - senkai, -100, 100);
       v3 = constrain(real_speed_y + real_speed_x + senkai, -100, 100);
       v4 = constrain(real_speed_y - real_speed_x - senkai, -100, 100);
     }
     else if (wheel_mode == 1)
-    {
+    { // ただのバック
       v1 = constrain(-real_speed_y + real_speed_x + senkai, -100, 100);
       v2 = constrain(-real_speed_y - real_speed_x - senkai, -100, 100);
       v3 = constrain(-real_speed_y - real_speed_x + senkai, -100, 100);
       v4 = constrain(-real_speed_y + real_speed_x - senkai, -100, 100);
+    }
+    else if (wheel_mode == 2)
+    { // いかさん
+      v1 = constrain(-real_speed_y - real_speed_x + senkai, -100, 100);
+      v2 = constrain(real_speed_y - real_speed_x - senkai, -100, 100);
+      v3 = constrain(real_speed_y - real_speed_x + senkai, -100, 100);
+      v4 = constrain(-real_speed_y - real_speed_x - senkai, -100, 100);
+    }
+    else if (wheel_mode == 3)
+    { // 万能手腕
+      v1 = constrain(real_speed_y + real_speed_x + senkai, -100, 100);
+      v2 = constrain(-real_speed_y + real_speed_x - senkai, -100, 100);
+      v3 = constrain(-real_speed_y + real_speed_x + senkai, -100, 100);
+      v4 = constrain(real_speed_y + real_speed_x - senkai, -100, 100);
     }
 
     send(SLAVE1_WHEEL_CONTROL_ID, 1, N, v1, v2, v3, v4, 0xAA, 0xAA);
