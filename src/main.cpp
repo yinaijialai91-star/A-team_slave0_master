@@ -453,19 +453,19 @@ void ctrl(void *pvParameters)
         if (MKM == 1)
         { // 釣り竿ちょい伸び切り, いかさん旋回
           send(SLAVE5_MARKER_ARM_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-          MOTOR3.set_locate(1672);
-          vTaskDelay(pdMS_TO_TICKS(2000));
+          MOTOR3.set_locate(1872);
+          vTaskDelay(pdMS_TO_TICKS(500));
         }
         else if (MKM == 2)
         { // ラック伸びきり
-          MOTOR4.set_locate(533);
-          vTaskDelay(pdMS_TO_TICKS(2000));
+          MOTOR4.set_locate(563);
+          vTaskDelay(pdMS_TO_TICKS(500));
         }
-        else if (MKM == 3)
-        { // 釣り竿伸び切り
-          MOTOR3.set_locate(1872);
-          vTaskDelay(pdMS_TO_TICKS(2000));
-        }
+        // else if (MKM == 3)
+        // { // 釣り竿伸び切り
+        //   MOTOR3.set_locate(1872);
+        //   vTaskDelay(pdMS_TO_TICKS(2000));
+        // }
       }
 
       /******************************************************************/
