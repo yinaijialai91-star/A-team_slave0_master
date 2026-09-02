@@ -23,17 +23,19 @@ Enc_TWAI MOTOR4; // 釣り竿ラック
 static const char *controller_addr_string = "98:B6:EA:96:93:4B";
 
 unsigned long now = 0, jikan = 0;
-uint8_t N = 1;    /*移動速度の倍率*/
-uint8_t R = 1;    /*万能アームの動作順*/
-uint8_t T_1 = 0;  /*皿用アームの動作順*/
-uint8_t T_2 = 8;  /*皿用アームコンプレッサー動作順*/
-uint8_t IK = 6;   /*いかさん用アーム動作順*/
-uint8_t IKK = 8;  /*いかさん用ハンド動作順*/
-uint8_t BALL = 4; /*万能アーム用サーボ昇降機構の動作順*/
-uint8_t MK = 1;   /*マーカー用モーター動作順*/
-uint8_t DS = 10;  /*皿用便利機能動作順*/
-uint8_t MKM = 0;  /*マーカー動作順*/
-uint8_t BBB = 9;  /*万能アーム用サーボムツゴロウ動作順*/
+uint8_t N = 2;         /*移動速度の倍率*/
+uint8_t R = 1;         /*万能アームの動作順*/
+uint8_t T_1 = 0;       /*皿用アームの動作順*/
+uint8_t T_2 = 8;       /*皿用アームコンプレッサー動作順*/
+uint8_t IK = 6;        /*いかさん用アーム動作順*/
+uint8_t IKK = 8;       /*いかさん用ハンド動作順*/
+uint8_t BALL = 4;      /*万能アーム用サーボ昇降機構の動作順*/
+uint8_t MK = 1;        /*マーカー用モーター動作順*/
+uint8_t DS = 10;       /*皿用便利機能動作順*/
+uint8_t MKM = 0;       /*マーカー動作順*/
+uint8_t BBB = 9;       /*万能アーム用サーボムツゴロウ動作順*/
+uint8_t past_duty = 0; /*過去の倍率*/
+bool teisoku = false;  /*低速モード入切*/
 
 bool task_created = false, IK_moved = false;
 bool motor1_stopped = false, motor2_stopped = false;
@@ -125,8 +127,8 @@ void ctrl(void *pvParameters)
 
     /*******************************共通*******************************/
 
-    stick_speed_x = map(ctl->axisX(), -511, 512, -100, 100); // 左スティックX取得
-    stick_speed_y = map(ctl->axisY(), -511, 512, -100, 100); // 左スティックY取得
+    stick_speed_x = map(ctl->axisX(), -511, 512, -50, 50); // 左スティックX取得
+    stick_speed_y = map(ctl->axisY(), -511, 512, -50, 50); // 左スティックY取得
 
     if (abs(stick_speed_x) < 5)
     { // X座標デッドゾーン
@@ -144,18 +146,25 @@ void ctrl(void *pvParameters)
 
     if (ctl->miscButtons() == 0x04)
     { // 移動速度の倍率変更(プラスボタン)
-      if (N < 2)
-        N++;
+      if (N < 4)
+        N += 2;
       else
-        N = 1;
+        N = 2;
       vTaskDelay(pdMS_TO_TICKS(500));
     }
     if (ctl->miscButtons() == 0x02)
     { // 移動速度の倍率変更(マイナスボタン)
-      if (N > 1)
-        N--;
+      if (!teisoku)
+      {
+        teisoku = true;
+        past_duty = N;
+        N = 1;
+      }
       else
-        N = 2;
+      {
+        teisoku = false;
+        N = past_duty;
+      }
       vTaskDelay(pdMS_TO_TICKS(500));
     }
 
@@ -175,13 +184,6 @@ void ctrl(void *pvParameters)
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
       vTaskDelay(pdMS_TO_TICKS(10));
       send(SLAVE5_MARKER_ARM_ID, ((mode == 2) ? 20 : 21), 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      // twai_message_t receiveframe;
-      // while (receiveframe.identifier != 0x20)
-      // {
-      //   send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      //   twai_receive(&receiveframe, pdMS_TO_TICKS(0));
-      //   Serial.printf("応答無為再送");
-      // }
     }
 
     if (ctl->buttons() == 0x100)
@@ -492,7 +494,7 @@ void vector_task(void *pvParameters)
 
     now = millis();
 
-    if (now - jikan >= 50)
+    if (now - jikan >= 10)
     {
       jikan = now;
 
