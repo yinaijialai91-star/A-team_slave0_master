@@ -37,13 +37,14 @@ bool teisoku = false;  /*低速モード入切*/
 
 bool task_created = false, IK_moved = false;
 bool motor1_stopped = false, motor2_stopped = false;
+bool m2006_stopped = false;
 
 int stick_speed_x = 0, stick_speed_y = 0;
 int8_t real_speed_x = 0, real_speed_y = 0;
 int8_t senkai = 0, real_senkai = 0;
-int8_t v1 = 0, v2 = 0, v3 = 0, v4 = 0;
+int8_t v1 = 0, v2 = 0, v3 = 0, v4 = 0; /*各タイヤのベクトル情報格納用関数*/
 
-uint8_t mode = 1, wheel_mode = 0;
+uint8_t mode = 0, wheel_mode = 0;
 
 ControllerPtr myControllers[1];
 
@@ -178,18 +179,35 @@ void ctrl(void *pvParameters)
       }
       printf("now_mode_is %d\n", mode);
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      vTaskDelay(pdMS_TO_TICKS(500));
+      vTaskDelay(pdMS_TO_TICKS(50));
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      vTaskDelay(pdMS_TO_TICKS(50));
+      send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      vTaskDelay(pdMS_TO_TICKS(50));
+      send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+    
     }
 
-    if (ctl->buttons() == 0x100)
-    {
-      if (wheel_mode < 3)
-        wheel_mode++;
-      else
-        wheel_mode = 0;
+    /******************************************************************/
 
-      vTaskDelay(pdMS_TO_TICKS(500));
+    /*******************************初期*******************************/
+
+    if(mode == 0)
+    {
+
+      wheel_mode = 0; // 前が前になるようにする
+
+      if (ctl->dpad() == 0x01)
+      { // ハンド開く(十字上)
+        send(SLAVE5_MARKER_ARM_ID, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->dpad() == 0x02)
+      { // ハンド閉じる(十字下)
+        send(SLAVE5_MARKER_ARM_ID, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+      }      
     }
 
     /******************************************************************/
@@ -197,7 +215,7 @@ void ctrl(void *pvParameters)
     /*******************************皿用*******************************/
     if (mode == 1)
     {
-      wheel_mode = 0;//前が前になるようにする
+      wheel_mode = 0; // 前が前になるようにする
 
       if (ctl->x())
       { // コンプレッサー動作変更
@@ -239,20 +257,17 @@ void ctrl(void *pvParameters)
         send(SLAVE2_DISHES_ARM_ID, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
-      else
+      else if(ctl->dpad() != 0x01 && ctl->dpad() != 0x02 && ctl->dpad() != 0x04 && ctl->dpad() != 0x08 && !m2006_stopped)
       { // 停止処理
+        m2006_stopped = true;
+        send(SLAVE2_DISHES_ARM_ID, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(50));
         send(SLAVE2_DISHES_ARM_ID, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(50));
       }
 
       if (ctl->b()) // 皿用便利機能
       {
-        if (!IK_moved)
-        {
-          send(SLAVE5_MARKER_ARM_ID, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-          IK_moved = true;
-          vTaskDelay(pdMS_TO_TICKS(200));
-        }
         if (DS < 13)
           DS++;
         else
@@ -268,7 +283,7 @@ void ctrl(void *pvParameters)
     if (mode == 2)
     {
 
-      wheel_mode = 2;//いかさんが前になるようにする
+      wheel_mode = 2; // いかさんが前になるようにする
 
       // if (ctl->x())
       // {
@@ -293,21 +308,20 @@ void ctrl(void *pvParameters)
 
       /***********いかさん昇降機構***********/
       if (ctl->y())
-      {/*いかさん上昇*/
+      { /*いかさん上昇*/
         MOTOR2.set_speed_stable(-200);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (ctl->a())
-      {//いかさん下降
+      { // いかさん下降
         MOTOR2.set_speed_stable(200);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (!ctl->y() && !ctl->a())
-      {//いかさん昇降機構停止
+      { // いかさん昇降機構停止
         MOTOR2.set_speed_stable(0);
         vTaskDelay(pdMS_TO_TICKS(10));
       }
-
     }
 
     /******************************************************************/
@@ -315,10 +329,10 @@ void ctrl(void *pvParameters)
     /*****************************万能手腕*****************************/
     if (mode == 3)
     {
-      wheel_mode = 3;//万能手腕が前になるようにする
+      wheel_mode = 3; // 万能手腕が前になるようにする
 
       if (ctl->b())
-      { // 万能アーム動作（仮
+      { // 万能アーム動作(ボール用)
         if (R < 6)
           R++;
         else
@@ -370,7 +384,7 @@ void ctrl(void *pvParameters)
       }
 
       if (ctl->buttons() == 0x20)
-      { // ちょい離し(Rボタン)
+      { // 万能手腕動作(Rボタン)(シャトル用)
         if (BBB < 13)
         {
           BBB++;
@@ -405,7 +419,7 @@ void ctrl(void *pvParameters)
     if (mode == 4)
     {
 
-      wheel_mode = 1;//バックするようにする
+      wheel_mode = 1; // バックするようにする
 
       if (ctl->b())
       { // サーボ倒す
@@ -487,11 +501,6 @@ void vector_task(void *pvParameters)
       }
     }
 
-    // int8_t v1 = constrain(real_speed_y - real_speed_x + senkai, -100, 100);
-    // int8_t v2 = constrain(real_speed_y + real_speed_x - senkai, -100, 100);
-    // int8_t v3 = constrain(real_speed_y + real_speed_x + senkai, -100, 100);
-    // int8_t v4 = constrain(real_speed_y - real_speed_x - senkai, -100, 100);
-
     if (wheel_mode == 0)
     { // お皿
       v1 = constrain(real_speed_y - real_speed_x + senkai, -100, 100);
@@ -524,8 +533,6 @@ void vector_task(void *pvParameters)
     send(SLAVE1_WHEEL_CONTROL_ID, 1, N, v1, v2, v3, v4, 0xAA, 0xAA);
 
     vTaskDelay(pdMS_TO_TICKS(10));
-
-    // send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
   }
 }
 
@@ -536,25 +543,10 @@ void setup()
 
   vTaskDelay(pdMS_TO_TICKS(200));
 
-  // /***********************************CAN関連********************************************/
-  // twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT((gpio_num_t)TX_PIN, (gpio_num_t)RX_PIN, TWAI_MODE_NORMAL);
-  // twai_timing_config_t t_config = TWAI_TIMING_CONFIG_1MBITS();
-  // twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-
-  // esp_err_t ret = twai_driver_install(&g_config, &t_config, &f_config);
-  // if (ret == ESP_OK) Serial.println("インストール完了");
-  // else Serial.println("インストール失敗");
-  // ret = twai_start();
-  // if (ret == ESP_OK) Serial.println("CANスタート完了");
-  // else Serial.println("CANスタート失敗");
-  // /**************************************************************************************/
-
   /************************************36GPMotor*****************************************/
 
   MOTOR1.setup(22, 21, 1); // 万能手腕
   MOTOR2.setup(22, 21, 2); // いかさん
-  MOTOR3.setup(22, 21, 3); // マーカー
-  MOTOR4.setup(22, 21, 4); // マーカー
 
   /**************************************************************************************/
 
@@ -577,7 +569,7 @@ void loop()
 { // コントローラーと接続を確立させた後にタスクを作成、looptaskを削除
 
   bool dataUpdated = BP32.update();
-  if (!task_created && dataUpdated && myControllers[0]->isConnected() && myControllers[0] != nullptr)
+  if (!task_created && dataUpdated && myControllers[0] != nullptr && myControllers[0]->isConnected())
   {
 
     task_created = true;
