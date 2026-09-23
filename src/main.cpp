@@ -21,20 +21,21 @@ Enc_TWAI MOTOR2; // いかさん
 static const char *controller_addr_string = "98:B6:EA:96:93:4B";
 
 unsigned long now = 0, jikan = 0;
-uint8_t N = 2;         /*移動速度の倍率*/
-uint8_t R = 1;         /*万能アームの動作順*/
-uint8_t T_1 = 0;       /*皿用アームの動作順*/
-uint8_t T_2 = 8;       /*皿用アームコンプレッサー動作順*/
-uint8_t IK_taosu = 0;  /*いかさんくるくる動作順*/
-uint8_t IK_hand = 0;   /*いかさん用ハンド動作順*/
-uint8_t IK_houyou = 0; /*いかさん抱擁動作準*/
-uint8_t BALL = 4;      /*万能アーム用サーボ昇降機構の動作順*/
-uint8_t MK = 1;        /*マーカー用モーター動作順*/
-uint8_t DS = 10;       /*皿用便利機能動作順*/
-uint8_t MKM = 0;       /*マーカー動作順*/
-uint8_t BBB = 9;       /*万能アーム用サーボムツゴロウ動作順*/
-uint8_t past_duty = 0; /*過去の倍率*/
-bool teisoku = false;  /*低速モード入切*/
+uint8_t N = 2;          /*移動速度の倍率*/
+uint8_t R = 1;          /*万能アームの動作順*/
+uint8_t T_1 = 0;        /*皿用アームの動作順*/
+uint8_t T_2 = 8;        /*皿用アームコンプレッサー動作順*/
+uint8_t IK_taosu = 0;   /*いかさんくるくる動作順*/
+uint8_t IK_hand = 0;    /*いかさん用ハンド動作順*/
+uint8_t IK_houyou = 0;  /*いかさん抱擁動作準*/
+uint8_t BALL_FIRST = 0; /*万能アーム目標ボール抽選*/
+uint8_t BALL = 4;       /*万能アーム用サーボ昇降機構の動作順*/
+uint8_t MK = 1;         /*マーカー用モーター動作順*/
+uint8_t DS = 10;        /*皿用便利機能動作順*/
+uint8_t MKM = 0;        /*マーカー動作順*/
+uint8_t BBB = 9;        /*万能アーム用サーボムツゴロウ動作順*/
+uint8_t past_duty = 0;  /*過去の倍率*/
+bool teisoku = false;   /*低速モード入切*/
 
 bool task_created = false, IK_moved = false;
 bool motor1_stopped = false, motor2_stopped = false;
@@ -139,10 +140,10 @@ void ctrl(void *pvParameters)
       stick_speed_y = 0;
     }
 
-    int right_round = map(ctl->brake(), 0, 1023, 0, 100);   // ZRボタン
-    int left_round = map(ctl->throttle(), 0, 1023, 0, 100); // ZLボタン
+    int right_round = map(ctl->brake(), 0, 1023, 0, 60);   // ZRボタン
+    int left_round = map(ctl->throttle(), 0, 1023, 0, 60); // ZLボタン
 
-    senkai = constrain(right_round - left_round, -100, 100); // 旋回のみ合成
+    senkai = constrain(right_round - left_round, -60, 60); // 旋回のみ合成
 
     if (ctl->miscButtons() == 0x04)
     { // 移動速度の倍率変更(プラスボタン)
@@ -170,7 +171,7 @@ void ctrl(void *pvParameters)
 
     if (ctl->buttons() == 0x200)
     { // モード変更(右スティック押し込み)
-      if (mode < 5)
+      if (mode < 4)
       {
         mode++;
       }
@@ -180,9 +181,11 @@ void ctrl(void *pvParameters)
       }
       printf("now_mode_is %d\n", mode);
       send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      vTaskDelay(pdMS_TO_TICKS(50));
-      send(SLAVEX_BUTSUDAN_LED_ID, mode, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-      vTaskDelay(pdMS_TO_TICKS(500));
+      vTaskDelay(pdMS_TO_TICKS(300));
+      if (mode == 3)
+      {
+        send(SLAVE4_SQUID_ARM_ID, 5, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      }
     }
 
     /******************************************************************/
@@ -291,102 +294,6 @@ void ctrl(void *pvParameters)
 
     /******************************************************************/
 
-    /*****************************万能手腕*****************************/
-  /*
-    if (mode == 2)
-    {
-      wheel_mode = 3; // 万能手腕が前になるようにする
-
-      if (teisoku)
-      {
-        teisoku = false;
-        N = past_duty;
-      }
-
-      if (ctl->b())
-      { // 万能アーム動作(ボール用)
-        if (R < 6)
-          R++;
-        else
-          R = 2;
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 3, R, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->y())
-      { // 万能アーム用昇降機構、下
-        MOTOR1.set_speed_stable(-240);
-        vTaskDelay(pdMS_TO_TICKS(5));
-        motor1_stopped = false;
-      }
-      else if (ctl->a())
-      { // 万能アーム用昇降機構、上
-        MOTOR1.set_speed_stable(240);
-        vTaskDelay(pdMS_TO_TICKS(5));
-        motor1_stopped = false;
-      }
-      else if (!ctl->y() && !ctl->a() && !motor1_stopped)
-      { // 万能アーム用昇降機構、停止
-        MOTOR1.set_speed_stable(0);
-        vTaskDelay(pdMS_TO_TICKS(10));
-        MOTOR1.set_speed_stable(0);
-        motor1_stopped = true;
-      }
-
-      if (ctl->dpad() == 0x0001)
-      { // 十字上（万能アーム用サーボ昇降機構)
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 4, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(5));
-      }
-      else if (ctl->dpad() == 0x0002)
-      { // 十字下(万能アーム用サーボ昇降機構)
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 4, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(5));
-      }
-
-      if (ctl->dpad() == 0x0004)
-      { // 十字右(万能アーム用ラック伸ばし)
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 7, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(5));
-      }
-      else if (ctl->dpad() == 0x0008)
-      { // 十字左(万能アーム用ラック縮め)
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 8, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(5));
-      }
-
-      if (ctl->buttons() == 0x20)
-      { // 万能手腕動作(Rボタン)(シャトル用)
-        if (BBB < 13)
-        {
-          BBB++;
-        }
-        else
-        {
-          BBB = 10;
-        }
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, BBB, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-      else if (ctl->buttons() == 0x10)
-      { // 掴む(Lボタン)
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 3, 4, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-
-      if (ctl->x())
-      { // 万能アーム用サーボ昇降機構、便利機能
-        if (BALL < 6)
-          BALL++;
-        else
-          BALL = 5;
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, BALL, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
-      }
-    }
-*/
-    /******************************************************************/
-
     /*****************************いかさん*****************************/
     if (mode == 2)
     {
@@ -432,6 +339,18 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
+      if (ctl->dpad() == 0x08)
+      {
+        send(SLAVE4_SQUID_ARM_ID, 5, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(300));
+      }
+
+      if (ctl->dpad() == 0x04)
+      {
+        send(SLAVE4_SQUID_ARM_ID, 5, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(300));
+      }
+
       /***********いかさん昇降機構***********/
       if (ctl->y())
       { /*いかさん上昇*/
@@ -465,11 +384,16 @@ void ctrl(void *pvParameters)
 
       if (ctl->b())
       { // 万能アーム動作(ボール用)
-        if (R < 6)
+        if (R < 5)
+        {
           R++;
+        }
         else
+        {
           R = 2;
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 3, R, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+          BALL_FIRST = (BALL_FIRST == 1) ? 0 : 1;
+        }
+        send(SLAVE3_ZEUS_ARM_STS3215_ID, 3, R, BALL_FIRST, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
@@ -575,6 +499,10 @@ void ctrl(void *pvParameters)
       { // 電磁弁開放(Rボタン)
         send(SLAVE2_DISHES_ARM_ID, 15, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(500));
+      }
+
+      if (ctl->dpad() == 0x08)
+      {
       }
 
       /******************************************************************/
