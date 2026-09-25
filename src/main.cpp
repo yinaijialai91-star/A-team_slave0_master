@@ -13,10 +13,10 @@
 #define SLAVE3_ZEUS_ARM_STS3215_ID 0x410 // 万能手腕
 #define SLAVE4_SQUID_ARM_ID 0x110        // いかさん
 #define SLAVE5_MARKER_ARM_ID 0x210       // マーカー
+#define SLAVE6_ZEUS_ARM_SHOUKOU_ID 0x150 // 万能手腕昇降
 #define SLAVEX_BUTSUDAN_LED_ID 0x115     // 仏壇
 
-Enc_TWAI MOTOR1; // 万能手腕
-Enc_TWAI MOTOR2; // いかさん
+Enc_TWAI MOTOR; // いかさん
 
 static const char *controller_addr_string = "98:B6:EA:96:93:4B";
 
@@ -354,17 +354,17 @@ void ctrl(void *pvParameters)
       /***********いかさん昇降機構***********/
       if (ctl->y())
       { /*いかさん上昇*/
-        MOTOR2.set_speed_stable(-255);
+        MOTOR.set_speed_stable(-255);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (ctl->a())
       { // いかさん下降
-        MOTOR2.set_speed_stable(255);
+        MOTOR.set_speed_stable(255);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (!ctl->y() && !ctl->a())
       { // いかさん昇降機構停止
-        MOTOR2.set_speed_stable(0);
+        MOTOR.set_speed_stable(0);
         vTaskDelay(pdMS_TO_TICKS(10));
       }
     }
@@ -399,21 +399,21 @@ void ctrl(void *pvParameters)
 
       if (ctl->y())
       { // 万能アーム用昇降機構、下
-        MOTOR1.set_speed_stable(-240);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(5));
         motor1_stopped = false;
       }
       else if (ctl->a())
       { // 万能アーム用昇降機構、上
-        MOTOR1.set_speed_stable(240);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(5));
         motor1_stopped = false;
       }
       else if (!ctl->y() && !ctl->a() && !motor1_stopped)
       { // 万能アーム用昇降機構、停止
-        MOTOR1.set_speed_stable(0);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(10));
-        MOTOR1.set_speed_stable(0);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         motor1_stopped = true;
       }
 
@@ -450,7 +450,11 @@ void ctrl(void *pvParameters)
           BBB = 10;
         }
         send(SLAVE3_ZEUS_ARM_STS3215_ID, BBB, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(400));
+        if (BBB == 13)
+        {
+          send(SLAVE4_SQUID_ARM_ID, 4, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        }
       }
       else if (ctl->buttons() == 0x10)
       { // 掴む(Lボタン)
@@ -501,8 +505,20 @@ void ctrl(void *pvParameters)
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
+      if (ctl->buttons() == 0x10)
+      {//サーボ戻す(L_butoon)
+        send(SLAVE4_SQUID_ARM_ID, 4, 4, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+      }
+
       if (ctl->dpad() == 0x08)
       {
+        send(SLAVE4_SQUID_ARM_ID, 4, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(200));
+      }
+      if (ctl->dpad() == 0x04)
+      {
+        send(SLAVE4_SQUID_ARM_ID, 4, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(200));
       }
 
       /******************************************************************/
@@ -605,8 +621,7 @@ void setup()
 
   /************************************36GPMotor*****************************************/
 
-  MOTOR1.setup(22, 21, 1); // 万能手腕
-  MOTOR2.setup(22, 21, 2); // いかさん
+  MOTOR.setup(22, 21, 2); // いかさん
 
   /**************************************************************************************/
 
