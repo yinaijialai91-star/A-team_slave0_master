@@ -13,7 +13,7 @@
 #define SLAVE3_ZEUS_ARM_STS3215_ID 0x410 // 万能手腕
 #define SLAVE4_SQUID_ARM_ID 0x110        // いかさん
 #define SLAVE5_MARKER_ARM_ID 0x210       // マーカー
-#define SLAVE6_ZEUS_ARM_SHOUKOU_ID 0x150 // 万能手腕昇降
+#define SLAVE6_ZEUS_ARM_SHOUKOU_ID 0x410 // 万能手腕昇降
 #define SLAVEX_BUTSUDAN_LED_ID 0x115     // 仏壇
 
 Enc_TWAI MOTOR; // いかさん
@@ -399,21 +399,21 @@ void ctrl(void *pvParameters)
 
       if (ctl->y())
       { // 万能アーム用昇降機構、下
-        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 1, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(5));
         motor1_stopped = false;
       }
       else if (ctl->a())
       { // 万能アーム用昇降機構、上
-        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 1, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(5));
         motor1_stopped = false;
       }
       else if (!ctl->y() && !ctl->a() && !motor1_stopped)
       { // 万能アーム用昇降機構、停止
-        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 1, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(10));
-        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 1, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         motor1_stopped = true;
       }
 
