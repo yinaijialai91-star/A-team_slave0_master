@@ -13,7 +13,7 @@
 #define SLAVE3_ZEUS_ARM_STS3215_ID 0x410 // 万能手腕
 #define SLAVE4_SQUID_ARM_ID 0x110        // いかさん
 #define SLAVE5_MARKER_ARM_ID 0x210       // マーカー
-#define SLAVE6_ZEUS_ARM_SHOUKOU_ID 0x410 // 万能手腕昇降
+#define SLAVE6_ZEUS_ARM_SHOUKOU_ID 0x120 // 万能手腕昇降
 #define SLAVEX_BUTSUDAN_LED_ID 0x115     // 仏壇
 
 Enc_TWAI MOTOR; // いかさん
@@ -22,7 +22,7 @@ static const char *controller_addr_string = "98:B6:EA:96:93:4B";
 
 unsigned long now = 0, jikan = 0;
 uint8_t N = 2;          /*移動速度の倍率*/
-uint8_t R = 1;          /*万能アームの動作順*/
+uint8_t R = 0;          /*万能アームの動作順*/
 uint8_t T_1 = 0;        /*皿用アームの動作順*/
 uint8_t T_2 = 8;        /*皿用アームコンプレッサー動作順*/
 uint8_t IK_taosu = 0;   /*いかさんくるくる動作順*/
@@ -384,16 +384,60 @@ void ctrl(void *pvParameters)
 
       if (ctl->b())
       { // 万能アーム動作(ボール用)
-        if (R < 5)
+        if (R < 10)
         {
           R++;
         }
         else
         {
-          R = 2;
-          BALL_FIRST = (BALL_FIRST == 1) ? 0 : 1;
+          R = 1;
         }
-        send(SLAVE3_ZEUS_ARM_STS3215_ID, 3, R, BALL_FIRST, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+
+        switch (R)
+        {
+        case 1:
+          send(SLAVE3_ZEUS_ARM_STS3215_ID, 1, 0, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕展開(テニスボール用)
+          break;
+
+        case 2:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 2, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕降下(テニスボール用)
+          vTaskDelay(pdMS_TO_TICKS(5));
+          send(SLAVE3_ZEUS_ARM_STS3215_ID, 2, 0, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕拾得(テニスボール用)
+          break;
+
+        case 3:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 3, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕上昇(テニスボール用)
+          break;
+
+        case 4:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 4, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕遺失(テニスボール用)
+          break;
+
+
+        case 5:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 2, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕降下(野球ボール用)
+          vTaskDelay(pdMS_TO_TICKS(5));
+          send(SLAVE3_ZEUS_ARM_STS3215_ID, 1, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕展開(野球ボール用)
+          break;
+
+        case 6:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 2, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕降下(野球ボール用)
+          vTaskDelay(pdMS_TO_TICKS(5));
+          send(SLAVE3_ZEUS_ARM_STS3215_ID, 2, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕拾得(野球ボール用)
+          break;
+
+        case 7:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 3, 2, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕上昇(野球ボール用)
+          break;
+
+        case 8:
+          send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 4, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA); // 万能手腕遺失(野球ボール用)
+          break;
+
+        default:
+          break;
+        }
+
         vTaskDelay(pdMS_TO_TICKS(500));
       }
 
@@ -506,7 +550,7 @@ void ctrl(void *pvParameters)
       }
 
       if (ctl->buttons() == 0x10)
-      {//サーボ戻す(L_butoon)
+      { // サーボ戻す(L_butoon)
         send(SLAVE4_SQUID_ARM_ID, 4, 4, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
       }
 
