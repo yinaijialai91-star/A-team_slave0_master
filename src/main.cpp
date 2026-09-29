@@ -506,7 +506,7 @@ void ctrl(void *pvParameters)
       }
 
       if (ctl->buttons() == 0x10)
-      {//サーボ戻す(L_butoon)
+      { // サーボ戻す(L_butoon)
         send(SLAVE4_SQUID_ARM_ID, 4, 4, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
       }
 
