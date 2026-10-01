@@ -354,16 +354,19 @@ void ctrl(void *pvParameters)
       /***********いかさん昇降機構***********/
       if (ctl->y())
       { /*いかさん上昇*/
+        motor2_stopped = false;
         MOTOR.set_speed_stable(-255);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
       else if (ctl->a())
       { // いかさん下降
+        motor2_stopped = false;
         MOTOR.set_speed_stable(255);
         vTaskDelay(pdMS_TO_TICKS(5));
       }
-      else if (!ctl->y() && !ctl->a())
+      else if (!ctl->y() && !ctl->a() && !motor2_stopped)
       { // いかさん昇降機構停止
+        motor2_stopped = true;
         MOTOR.set_speed_stable(0);
         vTaskDelay(pdMS_TO_TICKS(10));
       }
@@ -380,6 +383,7 @@ void ctrl(void *pvParameters)
       {
         teisoku = false;
         N = past_duty;
+        //MOTOR.set_locate(0);
       }
 
       if (ctl->b())
