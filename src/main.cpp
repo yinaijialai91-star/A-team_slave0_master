@@ -523,6 +523,8 @@ void ctrl(void *pvParameters)
       if (ctl->dpad() == 0x04)
       {
         send(SLAVE4_SQUID_ARM_ID, 4, 3, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 5, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
         vTaskDelay(pdMS_TO_TICKS(200));
       }
 
