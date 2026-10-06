@@ -140,10 +140,10 @@ void ctrl(void *pvParameters)
       stick_speed_y = 0;
     }
 
-    int right_round = map(ctl->brake(), 0, 1023, 0, 60);   // ZRボタン
-    int left_round = map(ctl->throttle(), 0, 1023, 0, 60); // ZLボタン
+    int right_round = map(ctl->brake(), 0, 1023, 0, 40);   // ZRボタン
+    int left_round = map(ctl->throttle(), 0, 1023, 0, 40); // ZLボタン
 
-    senkai = constrain(right_round - left_round, -60, 60); // 旋回のみ合成
+    senkai = constrain(right_round - left_round, -40, 40); // 旋回のみ合成
 
     if (ctl->miscButtons() == 0x04)
     { // 移動速度の倍率変更(プラスボタン)
@@ -383,7 +383,8 @@ void ctrl(void *pvParameters)
       {
         teisoku = false;
         N = past_duty;
-        //MOTOR.set_locate(0);
+        send(SLAVE6_ZEUS_ARM_SHOUKOU_ID, 1, 4, 1, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA);
+        // MOTOR.set_locate(0);
       }
 
       if (ctl->b())
@@ -569,15 +570,6 @@ void vector_task(void *pvParameters)
       if (real_speed_y > stick_speed_y)
       {
         real_speed_y -= 5;
-      }
-
-      if (real_senkai < senkai)
-      {
-        real_senkai += 5;
-      }
-      if (real_senkai > senkai)
-      {
-        real_senkai -= 5;
       }
     }
 
